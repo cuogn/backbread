@@ -27,13 +27,13 @@ class Product {
 
       // Filter theo category
       if (options.category_id) {
-        query += ` AND p.category_id = ?`;
+        query += ` AND p.category_id = $${params.length + 1}`;
         params.push(options.category_id);
       }
 
       // Search theo tên
       if (options.search) {
-        query += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
+        query += ` AND (p.name LIKE $${params.length + 1} OR p.description LIKE $${params.length + 2})`;
         params.push(`%${options.search}%`, `%${options.search}%`);
       }
 
@@ -42,11 +42,11 @@ class Product {
 
       // Phân trang
       if (options.limit) {
-        query += ` LIMIT ?`;
+        query += ` LIMIT $${params.length + 1}`;
         params.push(parseInt(options.limit));
         
         if (options.offset) {
-          query += ` OFFSET ?`;
+          query += ` OFFSET $${params.length + 2}`;
           params.push(parseInt(options.offset));
         }
       }
@@ -65,7 +65,7 @@ class Product {
         SELECT p.*, c.name as category_name 
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.id = ? AND p.is_available = true
+        WHERE p.id = $1 AND p.is_available = true
       `;
       
       const rows = await executeQuery(query, [id]);
@@ -87,7 +87,7 @@ class Product {
         SELECT p.*, c.name as category_name 
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.category_id = ? AND p.is_available = true
+        WHERE p.category_id = $1 AND p.is_available = true
         ORDER BY p.created_at DESC
       `;
       
@@ -103,7 +103,8 @@ class Product {
     try {
       const query = `
         INSERT INTO products (name, description, price, image_url, category_id, is_available)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
       `;
       
       const params = [
@@ -118,7 +119,7 @@ class Product {
       const result = await executeQuery(query, params);
       
       // Lấy sản phẩm vừa tạo
-      return await Product.findById(Number(result.insertId));
+      return await Product.findById(result[0].id);
     } catch (error) {
       throw new Error(`Lỗi khi tạo sản phẩm: ${error.message}`);
     }
@@ -131,27 +132,27 @@ class Product {
       const params = [];
 
       if (productData.name !== undefined) {
-        updates.push('name = ?');
+        updates.push('name = $1');
         params.push(productData.name);
       }
       if (productData.description !== undefined) {
-        updates.push('description = ?');
+        updates.push('description = $1');
         params.push(productData.description);
       }
       if (productData.price !== undefined) {
-        updates.push('price = ?');
+        updates.push('price = $1');
         params.push(productData.price);
       }
       if (productData.image_url !== undefined) {
-        updates.push('image_url = ?');
+        updates.push('image_url = $1');
         params.push(productData.image_url);
       }
       if (productData.category_id !== undefined) {
-        updates.push('category_id = ?');
+        updates.push('category_id = $1');
         params.push(productData.category_id);
       }
       if (productData.is_available !== undefined) {
-        updates.push('is_available = ?');
+        updates.push('is_available = $1');
         params.push(productData.is_available);
       }
 
@@ -161,7 +162,7 @@ class Product {
 
       params.push(id);
 
-      const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
+      const query = `UPDATE products SET ${updates.join(', ')} WHERE id = $1`;
       await executeQuery(query, params);
 
       return await Product.findById(id);
@@ -173,7 +174,7 @@ class Product {
   // Xóa sản phẩm (soft delete)
   static async delete(id) {
     try {
-      const query = `UPDATE products SET is_available = false WHERE id = ?`;
+      const query = `UPDATE products SET is_available = false WHERE id = $1`;
       await executeQuery(query, [id]);
       return true;
     } catch (error) {
@@ -188,12 +189,12 @@ class Product {
       const params = [];
 
       if (options.category_id) {
-        query += ` AND category_id = ?`;
+        query += ` AND category_id = $${params.length + 1}`;
         params.push(options.category_id);
       }
 
       if (options.search) {
-        query += ` AND (name LIKE ? OR description LIKE ?)`;
+        query += ` AND (name LIKE $${params.length + 1} OR description LIKE $${params.length + 2})`;
         params.push(`%${options.search}%`, `%${options.search}%`);
       }
 
@@ -234,13 +235,13 @@ class Product {
 
       // Filter theo category
       if (category) {
-        query += ` AND c.name = ?`;
+        query += ` AND c.name = $${params.length + 1}`;
         params.push(category);
       }
 
       // Search theo tên
       if (search) {
-        query += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
+        query += ` AND (p.name LIKE $${params.length + 1} OR p.description LIKE $${params.length + 2})`;
         params.push(`%${search}%`, `%${search}%`);
       }
 
@@ -248,7 +249,7 @@ class Product {
       query += ` ORDER BY p.created_at DESC`;
 
       // Phân trang
-      query += ` LIMIT ? OFFSET ?`;
+      query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
       const products = await executeQuery(query, params);
@@ -263,12 +264,12 @@ class Product {
       const countParams = [];
 
       if (category) {
-        countQuery += ` AND c.name = ?`;
+        countQuery += ` AND c.name = $${countParams.length + 1}`;
         countParams.push(category);
       }
 
       if (search) {
-        countQuery += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
+        countQuery += ` AND (p.name LIKE $${countParams.length + 1} OR p.description LIKE $${countParams.length + 2})`;
         countParams.push(`%${search}%`, `%${search}%`);
       }
 
@@ -288,6 +289,34 @@ class Product {
       console.error('Error finding products with pagination:', error);
       throw error;
     }
+  }
+
+  // Tìm kiếm sản phẩm theo từ khóa
+  static async search(keyword, category_id = null, limit = 10, offset = 0) {
+    let query = `
+      SELECT p.*, c.name as category_name 
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.is_available = 1
+    `;
+    
+    const params = [];
+    
+    if (keyword) {
+      query += ` AND (p.name LIKE $${params.length + 1} OR p.description LIKE $${params.length + 2})`;
+      params.push(`%${keyword}%`, `%${keyword}%`);
+    }
+    
+    if (category_id) {
+      query += ` AND p.category_id = $${params.length + 1}`;
+      params.push(category_id);
+    }
+    
+    query += ` ORDER BY p.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+    
+    const rows = await executeQuery(query, params);
+    return rows;
   }
 
   // Convert to JSON cho API response

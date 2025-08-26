@@ -65,9 +65,9 @@ class Order {
         params.push(options.date_to);
       }
 
-      // Search theo mã đơn hàng hoặc tên khách hàng
+      // Search theo order code, customer name, hoặc phone
       if (options.search) {
-        query += ` AND (o.order_code LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?)`;
+        query += ` AND (o.order_code LIKE $${params.length + 1} OR o.customer_name LIKE $${params.length + 2} OR o.customer_phone LIKE $${params.length + 3})`;
         params.push(`%${options.search}%`, `%${options.search}%`, `%${options.search}%`);
       }
 

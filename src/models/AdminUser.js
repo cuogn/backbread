@@ -8,7 +8,7 @@ class AdminUser {
   static async findByUsername(username) {
     const query = `
       SELECT * FROM admin_users 
-      WHERE (username = ? OR email = ?) AND is_active = 1
+      WHERE (username = $1 OR email = $2) AND is_active = 1
     `;
     const rows = await executeQuery(query, [username, username]);
     return rows[0];
@@ -19,7 +19,7 @@ class AdminUser {
     const query = `
       SELECT id, username, email, full_name, role, is_active, last_login, created_at 
       FROM admin_users 
-      WHERE id = ? AND is_active = 1
+      WHERE id = $1 AND is_active = 1
     `;
     const rows = await executeQuery(query, [id]);
     return rows[0];
@@ -34,14 +34,15 @@ class AdminUser {
     
     const query = `
       INSERT INTO admin_users (username, email, password, full_name, role)
-      VALUES (?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
     `;
     
     const result = await executeQuery(query, [
       username, email, hashedPassword, full_name, role
     ]);
     
-    return this.findById(result.insertId);
+    return this.findById(result[0].id);
   }
 
   // Cập nhật thông tin admin user
@@ -50,8 +51,8 @@ class AdminUser {
     
     const query = `
       UPDATE admin_users 
-      SET username = ?, email = ?, full_name = ?, role = ?, is_active = ?
-      WHERE id = ?
+      SET username = $1, email = $2, full_name = $3, role = $4, is_active = $5
+      WHERE id = $6
     `;
     
     await executeQuery(query, [username, email, full_name, role, is_active, id]);
@@ -62,7 +63,7 @@ class AdminUser {
   static async updatePassword(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     
-    const query = `UPDATE admin_users SET password = ? WHERE id = ?`;
+    const query = `UPDATE admin_users SET password = $1 WHERE id = $2`;
     await executeQuery(query, [hashedPassword, id]);
     
     return true;
@@ -70,7 +71,7 @@ class AdminUser {
 
   // Cập nhật last login
   static async updateLastLogin(id) {
-    const query = `UPDATE admin_users SET last_login = NOW() WHERE id = ?`;
+    const query = `UPDATE admin_users SET last_login = NOW() WHERE id = $1`;
     await executeQuery(query, [id]);
   }
 
@@ -115,7 +116,7 @@ class AdminUser {
 
   // Xóa admin user (soft delete)
   static async delete(id) {
-    const query = `UPDATE admin_users SET is_active = 0 WHERE id = ?`;
+    const query = `UPDATE admin_users SET is_active = 0 WHERE id = $1`;
     await executeQuery(query, [id]);
     return true;
   }
