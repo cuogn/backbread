@@ -9,6 +9,7 @@ const testCORS = async () => {
 
   const testOrigins = [
     'https://son-bread.vercel.app',
+    'https://www.banhmyson.com',  // Add new domain
     'http://localhost:3000',
     'https://backbread.onrender.com'
   ];
