@@ -8,7 +8,7 @@ class AdminUser {
   static async findByUsername(username) {
     const query = `
       SELECT * FROM admin_users 
-      WHERE (username = $1 OR email = $2) AND is_active = 1
+      WHERE (username = $1 OR email = $2) AND is_active = TRUE
     `;
     const rows = await executeQuery(query, [username, username]);
     return rows[0];
@@ -19,7 +19,7 @@ class AdminUser {
     const query = `
       SELECT id, username, email, full_name, role, is_active, last_login, created_at 
       FROM admin_users 
-      WHERE id = $1 AND is_active = 1
+      WHERE id = $1 AND is_active = TRUE
     `;
     const rows = await executeQuery(query, [id]);
     return rows[0];

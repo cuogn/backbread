@@ -65,7 +65,7 @@ class Product {
         SELECT p.*, c.name as category_name 
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.id = $1 AND p.is_available = true
+        WHERE p.id = $1 AND p.is_available = TRUE
       `;
       
       const rows = await executeQuery(query, [id]);
@@ -87,7 +87,7 @@ class Product {
         SELECT p.*, c.name as category_name 
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.category_id = $1 AND p.is_available = true
+        WHERE p.category_id = $1 AND p.is_available = TRUE
         ORDER BY p.created_at DESC
       `;
       
@@ -209,7 +209,7 @@ class Product {
   // Lấy số lượng sản phẩm
   static async getCount() {
     try {
-      const query = `SELECT COUNT(*) as count FROM products WHERE is_available = true`;
+      const query = `SELECT COUNT(*) as count FROM products WHERE is_available = TRUE`;
       const result = await executeQuery(query);
       return { count: Number(result[0].count) };
     } catch (error) {
@@ -297,7 +297,7 @@ class Product {
       SELECT p.*, c.name as category_name 
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_available = 1
+      WHERE p.is_available = TRUE
     `;
     
     const params = [];

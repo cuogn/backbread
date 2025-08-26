@@ -29,7 +29,7 @@ class Category {
   // Lấy danh mục theo ID
   static async findById(id) {
     try {
-      const query = `SELECT * FROM categories WHERE id = ? AND is_active = true`;
+      const query = `SELECT * FROM categories WHERE id = $1 AND is_active = true`;
       const rows = await executeQuery(query, [id]);
       
       if (rows.length === 0) {
@@ -45,7 +45,7 @@ class Category {
   // Lấy danh mục theo tên
   static async findByName(name) {
     try {
-      const query = `SELECT * FROM categories WHERE name = ? AND is_active = true`;
+      const query = `SELECT * FROM categories WHERE name = $1 AND is_active = true`;
       const rows = await executeQuery(query, [name]);
       
       if (rows.length === 0) {
@@ -64,8 +64,8 @@ class Category {
       const query = `
         SELECT c.*, COUNT(p.id) as product_count
         FROM categories c
-        LEFT JOIN products p ON c.id = p.category_id AND p.is_available = true
-        WHERE c.is_active = true
+        LEFT JOIN products p ON c.id = p.category_id AND p.is_available = TRUE
+        WHERE c.is_active = TRUE
         GROUP BY c.id
         ORDER BY c.created_at ASC
       `;
@@ -85,7 +85,8 @@ class Category {
     try {
       const query = `
         INSERT INTO categories (name, description, is_active)
-        VALUES (?, ?, ?)
+        VALUES ($1, $2, $3)
+        RETURNING id
       `;
       
       const params = [
@@ -97,9 +98,9 @@ class Category {
       const result = await executeQuery(query, params);
       
       // Lấy danh mục vừa tạo
-      return await Category.findById(Number(result.insertId));
+      return await Category.findById(result[0].id);
     } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === '23505') { // PostgreSQL unique constraint error
         throw new Error('Tên danh mục đã tồn tại');
       }
       throw new Error(`Lỗi khi tạo danh mục: ${error.message}`);
@@ -113,15 +114,15 @@ class Category {
       const params = [];
 
       if (categoryData.name !== undefined) {
-        updates.push('name = ?');
+        updates.push('name = $' + (params.length + 1));
         params.push(categoryData.name);
       }
       if (categoryData.description !== undefined) {
-        updates.push('description = ?');
+        updates.push('description = $' + (params.length + 1));
         params.push(categoryData.description);
       }
       if (categoryData.is_active !== undefined) {
-        updates.push('is_active = ?');
+        updates.push('is_active = $' + (params.length + 1));
         params.push(categoryData.is_active);
       }
 
@@ -131,12 +132,12 @@ class Category {
 
       params.push(id);
 
-      const query = `UPDATE categories SET ${updates.join(', ')} WHERE id = ?`;
+      const query = `UPDATE categories SET ${updates.join(', ')} WHERE id = $${params.length}`;
       await executeQuery(query, params);
 
       return await Category.findById(id);
     } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === '23505') { // PostgreSQL unique constraint error
         throw new Error('Tên danh mục đã tồn tại');
       }
       throw new Error(`Lỗi khi cập nhật danh mục: ${error.message}`);
@@ -150,7 +151,7 @@ class Category {
       const productCountQuery = `
         SELECT COUNT(*) as count 
         FROM products 
-        WHERE category_id = ? AND is_available = true
+        WHERE category_id = $1 AND is_available = TRUE
       `;
       const productCount = await executeQuery(productCountQuery, [id]);
       
@@ -158,7 +159,7 @@ class Category {
         throw new Error('Không thể xóa danh mục vì còn sản phẩm thuộc danh mục này');
       }
 
-      const query = `UPDATE categories SET is_active = false WHERE id = ?`;
+      const query = `UPDATE categories SET is_active = false WHERE id = $1`;
       await executeQuery(query, [id]);
       return true;
     } catch (error) {
