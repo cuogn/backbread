@@ -1,86 +1,91 @@
-const mariadb = require('mariadb');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Cấu hình connection pool cho MariaDB
-const pool = mariadb.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'banh_mi_son',
-  connectionLimit: 20,
-  acquireTimeout: 30000,
-  timeout: 30000,
-  charset: 'utf8mb4',
-  // Tự động reconnect khi mất kết nối
-  reconnect: true
-});
+// Parse PostgreSQL connection string
+const parseConnectionString = (connectionString) => {
+  const url = new URL(connectionString);
+  return {
+    host: url.hostname,
+    port: url.port,
+    user: url.username,
+    password: url.password,
+    database: url.pathname.slice(1), // Remove leading slash
+    ssl: {
+      rejectUnauthorized: false // For Render.com PostgreSQL
+    }
+  };
+};
+
+// Cấu hình connection pool cho PostgreSQL
+const pool = new Pool(parseConnectionString(process.env.DATABASE_URL || 'postgresql://localhost:5432/banh_mi_son'));
 
 // Test kết nối database
 const testConnection = async () => {
-  let conn;
+  let client;
   try {
-    conn = await pool.getConnection();
-    console.log('✅ Kết nối MariaDB thành công!');
+    client = await pool.connect();
+    console.log('✅ Kết nối PostgreSQL thành công!');
     
     // Test query
-    const rows = await conn.query('SELECT 1 as test');
-    console.log('✅ Test query thành công:', rows);
+    const result = await client.query('SELECT NOW() as current_time');
+    console.log('✅ Test query thành công:', result.rows[0]);
     
   } catch (err) {
-    console.error('❌ Lỗi kết nối MariaDB:', err.message);
+    console.error('❌ Lỗi kết nối PostgreSQL:', err.message);
     throw err;
   } finally {
-    if (conn) conn.release();
+    if (client) client.release();
   }
 };
 
 // Hàm thực thi query với error handling
 const executeQuery = async (query, params = []) => {
-  let conn;
+  let client;
   try {
-    conn = await pool.getConnection();
-    const result = await conn.query(query, params);
-    return result;
+    client = await pool.connect();
+    const result = await client.query(query, params);
+    return result.rows;
   } catch (err) {
     console.error('❌ Database Query Error:', err.message);
     console.error('Query:', query);
     console.error('Params:', params);
     throw err;
   } finally {
-    if (conn) conn.release();
+    if (client) client.release();
   }
 };
 
 // Hàm thực thi transaction
 const executeTransaction = async (queries) => {
-  let conn;
+  let client;
   try {
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
+    client = await pool.connect();
+    await client.query('BEGIN');
     
     const results = [];
-    for (const { query, params } of queries) {
-      const result = await conn.query(query, params);
-      results.push(result);
+    for (const query of queries) {
+      const result = await client.query(query.sql, query.params || []);
+      results.push(result.rows);
     }
     
-    await conn.commit();
+    await client.query('COMMIT');
     return results;
   } catch (err) {
-    if (conn) await conn.rollback();
+    if (client) {
+      await client.query('ROLLBACK');
+    }
     console.error('❌ Transaction Error:', err.message);
     throw err;
   } finally {
-    if (conn) conn.release();
+    if (client) client.release();
   }
 };
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('🔄 Đang đóng kết nối database...');
+  console.log('\n🔄 Đang đóng kết nối database...');
   await pool.end();
-  console.log('✅ Đã đóng kết nối database');
+  console.log('✅ Database connections đã đóng');
   process.exit(0);
 });
 

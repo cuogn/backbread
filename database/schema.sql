@@ -1,131 +1,156 @@
 -- Bánh Mì Sơn Database Schema
--- MariaDB/MySQL Database Schema
-
--- Tạo database
-CREATE DATABASE IF NOT EXISTS banh_mi_son CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE banh_mi_son;
+-- PostgreSQL Database Schema
 
 -- Bảng categories (Danh mục sản phẩm)
 CREATE TABLE categories (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng products (Sản phẩm)
 CREATE TABLE products (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
     image_url VARCHAR(500),
-    category_id INT,
+    category_id INTEGER,
     is_available BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
-    INDEX idx_category (category_id),
-    INDEX idx_available (is_available)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 
 -- Bảng branches (Chi nhánh)
 CREATE TABLE branches (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     address TEXT NOT NULL,
     phone VARCHAR(20) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_active (is_active)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng customers (Khách hàng)
 CREATE TABLE customers (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(20) NOT NULL UNIQUE,
     email VARCHAR(200),
     address TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_phone (phone),
-    INDEX idx_phone (phone),
-    INDEX idx_email (email)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng payment_methods (Phương thức thanh toán)
 CREATE TABLE payment_methods (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     code VARCHAR(50) NOT NULL UNIQUE,
     icon VARCHAR(10),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Bảng admin (Quản trị viên)
+-- Bảng admin_users (Quản trị viên)
 CREATE TABLE admin_users (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(200) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(200) NOT NULL,
-    role ENUM('admin', 'manager') DEFAULT 'admin',
+    role VARCHAR(20) DEFAULT 'admin' CHECK (role IN ('admin', 'manager')),
     is_active BOOLEAN DEFAULT TRUE,
-    last_login TIMESTAMP NULL,
+    last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username),
-    INDEX idx_email (email),
-    INDEX idx_active (is_active)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Bảng orders (Đơn hàng)
 CREATE TABLE orders (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     order_code VARCHAR(50) NOT NULL UNIQUE,
-    customer_id INT NOT NULL,
-    branch_id INT NOT NULL,
-    payment_method_id INT NOT NULL,
+    customer_id INTEGER NOT NULL,
+    branch_id INTEGER NOT NULL,
+    payment_method_id INTEGER NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
-    status ENUM('pending', 'confirmed', 'preparing', 'delivering', 'completed', 'cancelled') DEFAULT 'pending',
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'preparing', 'delivering', 'completed', 'cancelled')),
     customer_name VARCHAR(200) NOT NULL,
     customer_phone VARCHAR(20) NOT NULL,
     customer_email VARCHAR(200),
     delivery_address TEXT NOT NULL,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE RESTRICT,
-    FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE RESTRICT,
-    INDEX idx_order_code (order_code),
-    INDEX idx_customer (customer_id),
-    INDEX idx_branch (branch_id),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE RESTRICT
 );
 
 -- Bảng order_items (Chi tiết đơn hàng)
 CREATE TABLE order_items (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    order_id INT NOT NULL,
-    product_id INT NOT NULL,
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
     product_name VARCHAR(200) NOT NULL,
     product_price DECIMAL(10,2) NOT NULL,
-    quantity INT NOT NULL DEFAULT 1,
+    quantity INTEGER NOT NULL DEFAULT 1,
     subtotal DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
-    INDEX idx_order (order_id),
-    INDEX idx_product (product_id)
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
 );
+
+-- Tạo indexes cho products
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_available ON products(is_available);
+
+-- Tạo index cho branches
+CREATE INDEX idx_branches_active ON branches(is_active);
+
+-- Tạo indexes cho customers
+CREATE INDEX idx_customers_phone ON customers(phone);
+CREATE INDEX idx_customers_email ON customers(email);
+
+-- Tạo indexes cho admin_users
+CREATE INDEX idx_admin_users_username ON admin_users(username);
+CREATE INDEX idx_admin_users_email ON admin_users(email);
+CREATE INDEX idx_admin_users_active ON admin_users(is_active);
+
+-- Tạo indexes cho orders
+CREATE INDEX idx_orders_order_code ON orders(order_code);
+CREATE INDEX idx_orders_customer ON orders(customer_id);
+CREATE INDEX idx_orders_branch ON orders(branch_id);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+
+-- Tạo indexes cho order_items
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_product ON order_items(product_id);
+
+-- Tạo function để tự động cập nhật updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $func$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$func$ language plpgsql;
+
+-- Tạo triggers để tự động cập nhật updated_at
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_payment_methods_updated_at BEFORE UPDATE ON payment_methods FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_admin_users_updated_at BEFORE UPDATE ON admin_users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert dữ liệu mẫu
 

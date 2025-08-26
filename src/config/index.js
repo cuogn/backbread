@@ -10,11 +10,7 @@ const config = {
 
   // Database Configuration
   database: {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'banh_mi_son'
+    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/banh_mi_son'
   },
 
   // JWT Configuration
