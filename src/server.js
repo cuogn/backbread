@@ -18,13 +18,11 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// CORS configuration
-app.use(cors({
-  origin: config.cors.origin,
-  credentials: config.cors.credentials,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+// CORS configuration with better error handling
+app.use(cors(config.cors));
+
+// Handle CORS preflight requests
+app.options('*', cors(config.cors));
 
 // Compression middleware
 app.use(compression());
@@ -56,13 +54,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static files
 app.use('/uploads', express.static('uploads'));
 
-// Health check endpoint (before routes)
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
-    message: 'Server đang hoạt động',
+    message: 'Bánh Mì Sơn API Server đang hoạt động bình thường',
     timestamp: new Date().toISOString(),
-    environment: config.server.env
+    environment: config.server.env,
+    version: '1.0.0'
   });
 });
 
@@ -73,14 +72,17 @@ app.use('/api', routes);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Chào mừng đến với Bánh Mì Sơn API Server',
+    message: 'Bánh Mì Sơn API Server',
     version: '1.0.0',
-    environment: config.server.env,
     endpoints: {
-      api: '/api',
       health: '/health',
-      docs: '/api'
-    }
+      api: '/api',
+      products: '/api/products',
+      categories: '/api/categories',
+      orders: '/api/orders',
+      branches: '/api/branches'
+    },
+    documentation: 'API documentation available at /api'
   });
 });
 
@@ -106,6 +108,9 @@ const startServer = async () => {
       console.log(`   API Endpoints: ${config.server.baseUrl}/api`);
       console.log(`   Health Check: ${config.server.baseUrl}/health`);
       console.log('✅ Bánh Mì Sơn API Server đã khởi động thành công!');
+      console.log('🌐 CORS enabled for:');
+      console.log('   - https://son-bread.vercel.app');
+      console.log('   - http://localhost:3000 (development)');
     });
 
     // Graceful shutdown handling
@@ -134,8 +139,8 @@ const startServer = async () => {
 };
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
   process.exit(1);
 });
 

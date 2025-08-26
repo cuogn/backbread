@@ -19,10 +19,31 @@ const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   },
 
-  // CORS Configuration
+  // CORS Configuration - Support multiple origins
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        'https://son-bread.vercel.app',           // Production frontend
+        'https://www.son-bread.vercel.app',       // Production frontend with www
+        'http://localhost:3000',                  // Local development frontend
+        'http://127.0.0.1:3000',                  // Local development frontend alternative
+        'https://backbread.onrender.com'          // Backend itself (for testing)
+      ];
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range']
   },
 
   // File Upload Configuration
