@@ -30,7 +30,7 @@ class Branch {
   // Lấy chi nhánh theo ID
   static async findById(id) {
     try {
-      const query = `SELECT * FROM branches WHERE id = ? AND is_active = true`;
+      const query = `SELECT * FROM branches WHERE id = $1 AND is_active = true`;
       const rows = await executeQuery(query, [id]);
       
       if (rows.length === 0) {
@@ -48,7 +48,8 @@ class Branch {
     try {
       const query = `
         INSERT INTO branches (name, address, phone, is_active)
-        VALUES (?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
       `;
       
       const params = [
@@ -61,7 +62,7 @@ class Branch {
       const result = await executeQuery(query, params);
       
       // Lấy chi nhánh vừa tạo
-      return await Branch.findById(Number(result.insertId));
+      return await Branch.findById(Number(result[0].id));
     } catch (error) {
       throw new Error(`Lỗi khi tạo chi nhánh: ${error.message}`);
     }
@@ -72,21 +73,22 @@ class Branch {
     try {
       const updates = [];
       const params = [];
+      let paramIndex = 1;
 
       if (branchData.name !== undefined) {
-        updates.push('name = ?');
+        updates.push(`name = $${paramIndex++}`);
         params.push(branchData.name);
       }
       if (branchData.address !== undefined) {
-        updates.push('address = ?');
+        updates.push(`address = $${paramIndex++}`);
         params.push(branchData.address);
       }
       if (branchData.phone !== undefined) {
-        updates.push('phone = ?');
+        updates.push(`phone = $${paramIndex++}`);
         params.push(branchData.phone);
       }
       if (branchData.is_active !== undefined) {
-        updates.push('is_active = ?');
+        updates.push(`is_active = $${paramIndex++}`);
         params.push(branchData.is_active);
       }
 
@@ -96,7 +98,7 @@ class Branch {
 
       params.push(id);
 
-      const query = `UPDATE branches SET ${updates.join(', ')} WHERE id = ?`;
+      const query = `UPDATE branches SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
       await executeQuery(query, params);
 
       return await Branch.findById(id);
@@ -112,7 +114,7 @@ class Branch {
       const orderCountQuery = `
         SELECT COUNT(*) as count 
         FROM orders 
-        WHERE branch_id = ?
+        WHERE branch_id = $1
       `;
       const orderCount = await executeQuery(orderCountQuery, [id]);
       
@@ -120,7 +122,7 @@ class Branch {
         throw new Error('Không thể xóa chi nhánh vì có đơn hàng liên quan');
       }
 
-      const query = `UPDATE branches SET is_active = false WHERE id = ?`;
+      const query = `UPDATE branches SET is_active = false WHERE id = $1`;
       await executeQuery(query, [id]);
       return true;
     } catch (error) {

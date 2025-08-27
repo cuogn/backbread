@@ -130,29 +130,30 @@ class Product {
     try {
       const updates = [];
       const params = [];
+      let paramIndex = 1;
 
       if (productData.name !== undefined) {
-        updates.push('name = $1');
+        updates.push(`name = $${paramIndex++}`);
         params.push(productData.name);
       }
       if (productData.description !== undefined) {
-        updates.push('description = $1');
+        updates.push(`description = $${paramIndex++}`);
         params.push(productData.description);
       }
       if (productData.price !== undefined) {
-        updates.push('price = $1');
+        updates.push(`price = $${paramIndex++}`);
         params.push(productData.price);
       }
       if (productData.image_url !== undefined) {
-        updates.push('image_url = $1');
+        updates.push(`image_url = $${paramIndex++}`);
         params.push(productData.image_url);
       }
       if (productData.category_id !== undefined) {
-        updates.push('category_id = $1');
+        updates.push(`category_id = $${paramIndex++}`);
         params.push(productData.category_id);
       }
       if (productData.is_available !== undefined) {
-        updates.push('is_available = $1');
+        updates.push(`is_available = $${paramIndex++}`);
         params.push(productData.is_available);
       }
 
@@ -162,7 +163,7 @@ class Product {
 
       params.push(id);
 
-      const query = `UPDATE products SET ${updates.join(', ')} WHERE id = $1`;
+      const query = `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
       await executeQuery(query, params);
 
       return await Product.findById(id);

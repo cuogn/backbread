@@ -30,7 +30,7 @@ class PaymentMethod {
   // Lấy phương thức thanh toán theo ID
   static async findById(id) {
     try {
-      const query = `SELECT * FROM payment_methods WHERE id = ? AND is_active = true`;
+      const query = `SELECT * FROM payment_methods WHERE id = $1 AND is_active = true`;
       const rows = await executeQuery(query, [id]);
       
       if (rows.length === 0) {
@@ -46,7 +46,7 @@ class PaymentMethod {
   // Lấy phương thức thanh toán theo code
   static async findByCode(code) {
     try {
-      const query = `SELECT * FROM payment_methods WHERE code = ? AND is_active = true`;
+      const query = `SELECT * FROM payment_methods WHERE code = $1 AND is_active = true`;
       const rows = await executeQuery(query, [code]);
       
       if (rows.length === 0) {
@@ -64,7 +64,8 @@ class PaymentMethod {
     try {
       const query = `
         INSERT INTO payment_methods (name, code, icon, is_active)
-        VALUES (?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
       `;
       
       const params = [
@@ -77,9 +78,9 @@ class PaymentMethod {
       const result = await executeQuery(query, params);
       
       // Lấy phương thức thanh toán vừa tạo
-      return await PaymentMethod.findById(Number(result.insertId));
+      return await PaymentMethod.findById(Number(result[0].id));
     } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === '23505') {
         throw new Error('Mã phương thức thanh toán đã tồn tại');
       }
       throw new Error(`Lỗi khi tạo phương thức thanh toán: ${error.message}`);
@@ -91,21 +92,22 @@ class PaymentMethod {
     try {
       const updates = [];
       const params = [];
+      let paramIndex = 1;
 
       if (paymentMethodData.name !== undefined) {
-        updates.push('name = ?');
+        updates.push(`name = $${paramIndex++}`);
         params.push(paymentMethodData.name);
       }
       if (paymentMethodData.code !== undefined) {
-        updates.push('code = ?');
+        updates.push(`code = $${paramIndex++}`);
         params.push(paymentMethodData.code);
       }
       if (paymentMethodData.icon !== undefined) {
-        updates.push('icon = ?');
+        updates.push(`icon = $${paramIndex++}`);
         params.push(paymentMethodData.icon);
       }
       if (paymentMethodData.is_active !== undefined) {
-        updates.push('is_active = ?');
+        updates.push(`is_active = $${paramIndex++}`);
         params.push(paymentMethodData.is_active);
       }
 
@@ -115,12 +117,12 @@ class PaymentMethod {
 
       params.push(id);
 
-      const query = `UPDATE payment_methods SET ${updates.join(', ')} WHERE id = ?`;
+      const query = `UPDATE payment_methods SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
       await executeQuery(query, params);
 
       return await PaymentMethod.findById(id);
     } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === '23505') {
         throw new Error('Mã phương thức thanh toán đã tồn tại');
       }
       throw new Error(`Lỗi khi cập nhật phương thức thanh toán: ${error.message}`);
@@ -134,7 +136,7 @@ class PaymentMethod {
       const orderCountQuery = `
         SELECT COUNT(*) as count 
         FROM orders 
-        WHERE payment_method_id = ?
+        WHERE payment_method_id = $1
       `;
       const orderCount = await executeQuery(orderCountQuery, [id]);
       
@@ -142,7 +144,7 @@ class PaymentMethod {
         throw new Error('Không thể xóa phương thức thanh toán vì có đơn hàng sử dụng');
       }
 
-      const query = `UPDATE payment_methods SET is_active = false WHERE id = ?`;
+      const query = `UPDATE payment_methods SET is_active = false WHERE id = $1`;
       await executeQuery(query, [id]);
       return true;
     } catch (error) {

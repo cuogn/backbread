@@ -116,7 +116,7 @@ class AdminUser {
 
   // Xóa admin user (soft delete)
   static async delete(id) {
-    const query = `UPDATE admin_users SET is_active = 0 WHERE id = $1`;
+    const query = `UPDATE admin_users SET is_active = FALSE WHERE id = $1`;
     await executeQuery(query, [id]);
     return true;
   }

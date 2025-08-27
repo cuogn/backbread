@@ -45,23 +45,23 @@ class Order {
 
       // Filter theo status
       if (options.status) {
-        query += ` AND o.status = ?`;
+        query += ` AND o.status = $${params.length + 1}`;
         params.push(options.status);
       }
 
       // Filter theo branch
       if (options.branch_id) {
-        query += ` AND o.branch_id = ?`;
+        query += ` AND o.branch_id = $${params.length + 1}`;
         params.push(options.branch_id);
       }
 
       // Filter theo ngày
       if (options.date_from) {
-        query += ` AND DATE(o.created_at) >= ?`;
+        query += ` AND DATE(o.created_at) >= $${params.length + 1}`;
         params.push(options.date_from);
       }
       if (options.date_to) {
-        query += ` AND DATE(o.created_at) <= ?`;
+        query += ` AND DATE(o.created_at) <= $${params.length + 1}`;
         params.push(options.date_to);
       }
 
@@ -76,11 +76,11 @@ class Order {
 
       // Phân trang
       if (options.limit) {
-        query += ` LIMIT ?`;
+        query += ` LIMIT $${params.length + 1}`;
         params.push(parseInt(options.limit));
         
         if (options.offset) {
-          query += ` OFFSET ?`;
+          query += ` OFFSET $${params.length + 1}`;
           params.push(parseInt(options.offset));
         }
       }
@@ -107,7 +107,7 @@ class Order {
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN branches b ON o.branch_id = b.id
         LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
-        WHERE o.id = ?
+        WHERE o.id = $1
       `;
       
       const rows = await executeQuery(query, [id]);
@@ -142,7 +142,7 @@ class Order {
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN branches b ON o.branch_id = b.id
         LEFT JOIN payment_methods pm ON o.payment_method_id = pm.id
-        WHERE o.order_code = ?
+        WHERE o.order_code = $1
       `;
       
       const rows = await executeQuery(query, [orderCode]);
@@ -169,7 +169,7 @@ class Order {
         SELECT oi.*, p.name as product_name, p.image_url as product_image
         FROM order_items oi
         LEFT JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = ?
+        WHERE oi.order_id = $1
         ORDER BY oi.id
       `;
       
@@ -191,7 +191,7 @@ class Order {
       // 1. Tạo hoặc lấy customer
       let customerId;
       const existingCustomer = await executeQuery(
-        'SELECT id FROM customers WHERE phone = ?',
+        'SELECT id FROM customers WHERE phone = $1',
         [orderData.customerInfo.phone]
       );
       
@@ -199,7 +199,7 @@ class Order {
         customerId = existingCustomer[0].id;
         // Cập nhật thông tin customer
         queries.push({
-          query: `UPDATE customers SET name = ?, email = ?, address = ? WHERE id = ?`,
+          sql: `UPDATE customers SET name = $1, email = $2, address = $3 WHERE id = $4`,
           params: [
             orderData.customerInfo.name,
             orderData.customerInfo.email || null,
@@ -210,7 +210,7 @@ class Order {
       } else {
         // Tạo customer mới
         queries.push({
-          query: `INSERT INTO customers (name, phone, email, address) VALUES (?, ?, ?, ?)`,
+          sql: `INSERT INTO customers (name, phone, email, address) VALUES ($1, $2, $3, $4) RETURNING id`,
           params: [
             orderData.customerInfo.name,
             orderData.customerInfo.phone,
@@ -226,7 +226,7 @@ class Order {
           order_code, customer_id, branch_id, payment_method_id, 
           total_amount, customer_name, customer_phone, customer_email, 
           delivery_address, notes, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id
       `;
       
       // 3. Thực thi transaction
@@ -235,7 +235,7 @@ class Order {
         ...(existingCustomer.length === 0 ? [queries[0]] : []),
         // Tạo order
         {
-          query: orderQuery,
+          sql: orderQuery,
           params: [
             orderCode,
             existingCustomer.length > 0 ? customerId : null, // Sẽ được set sau khi tạo customer
@@ -253,13 +253,13 @@ class Order {
       ]);
 
       // Lấy order ID
-      const orderId = Number(results[results.length - 1].insertId);
+      const orderId = Number(results[results.length - 1][0].id);
       
       // Nếu tạo customer mới, cập nhật customer_id cho order
       if (existingCustomer.length === 0) {
-        const newCustomerId = Number(results[0].insertId);
+        const newCustomerId = Number(results[0][0].id);
         await executeQuery(
-          'UPDATE orders SET customer_id = ? WHERE id = ?',
+          'UPDATE orders SET customer_id = $1 WHERE id = $2',
           [newCustomerId, orderId]
         );
       }
@@ -268,7 +268,7 @@ class Order {
       for (const item of orderData.items) {
         await executeQuery(
           `INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [
             orderId,
             item.product.id,
@@ -296,7 +296,7 @@ class Order {
         throw new Error('Trạng thái đơn hàng không hợp lệ');
       }
 
-      const query = `UPDATE orders SET status = ? WHERE id = ?`;
+      const query = `UPDATE orders SET status = $1 WHERE id = $2`;
       await executeQuery(query, [status, id]);
 
       return await this.findById(id);
@@ -312,13 +312,13 @@ class Order {
       const params = [];
 
       if (options.date_from && options.date_to) {
-        dateCondition = 'WHERE DATE(created_at) BETWEEN ? AND ?';
+        dateCondition = 'WHERE DATE(created_at) BETWEEN $1 AND $2';
         params.push(options.date_from, options.date_to);
       } else if (options.date_from) {
-        dateCondition = 'WHERE DATE(created_at) >= ?';
+        dateCondition = 'WHERE DATE(created_at) >= $1';
         params.push(options.date_from);
       } else if (options.date_to) {
-        dateCondition = 'WHERE DATE(created_at) <= ?';
+        dateCondition = 'WHERE DATE(created_at) <= $1';
         params.push(options.date_to);
       }
 
@@ -365,7 +365,7 @@ class Order {
   // Lấy số lượng đơn hàng hôm nay
   static async getTodayCount() {
     try {
-      const query = `SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = CURDATE()`;
+      const query = `SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = CURRENT_DATE`;
       const result = await executeQuery(query);
       return { count: Number(result[0].count) };
     } catch (error) {
@@ -409,13 +409,13 @@ class Order {
 
       // Filter theo status
       if (status) {
-        query += ` AND o.status = ?`;
+        query += ` AND o.status = $${params.length + 1}`;
         params.push(status);
       }
 
       // Filter theo branch
       if (branch_id) {
-        query += ` AND o.branch_id = ?`;
+        query += ` AND o.branch_id = $${params.length + 1}`;
         params.push(branch_id);
       }
 
@@ -423,7 +423,7 @@ class Order {
       query += ` ORDER BY o.created_at DESC`;
 
       // Phân trang
-      query += ` LIMIT ? OFFSET ?`;
+      query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
       const orders = await executeQuery(query, params);
@@ -437,12 +437,12 @@ class Order {
       const countParams = [];
 
       if (status) {
-        countQuery += ` AND o.status = ?`;
+        countQuery += ` AND o.status = $${countParams.length + 1}`;
         countParams.push(status);
       }
 
       if (branch_id) {
-        countQuery += ` AND o.branch_id = ?`;
+        countQuery += ` AND o.branch_id = $${countParams.length + 1}`;
         countParams.push(branch_id);
       }
 
