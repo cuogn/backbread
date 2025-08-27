@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 const { validate, productSchemas, querySchemas } = require('../middleware/validation');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticateAdmin, requireAdminOrManager } = require('../middleware/auth');
+const { uploadSingleImage, deleteImage, getImageUrl } = require('../middleware/upload');
 
 // GET /api/products - Lấy danh sách sản phẩm
 router.get('/', 
@@ -96,9 +99,44 @@ router.get('/category/:categoryId', asyncHandler(async (req, res) => {
 
 // POST /api/products - Tạo sản phẩm mới (Admin only)
 router.post('/', 
-  validate(productSchemas.create),
+  authenticateAdmin,
+  requireAdminOrManager,
+  uploadSingleImage('image'),
   asyncHandler(async (req, res) => {
-    const productData = req.body;
+    const { name, description, price, category_id, is_available } = req.body;
+
+    // Validate required fields
+    if (!name || !price || !category_id) {
+      // Xóa file đã upload nếu có lỗi validation
+      if (req.file) {
+        deleteImage(req.file.filename);
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ thông tin: tên, giá, danh mục'
+      });
+    }
+
+    // Kiểm tra danh mục có tồn tại không
+    const category = await Category.findById(parseInt(category_id));
+    if (!category) {
+      if (req.file) {
+        deleteImage(req.file.filename);
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Danh mục không tồn tại'
+      });
+    }
+
+    const productData = {
+      name,
+      description: description || '',
+      price: parseFloat(price),
+      category_id: parseInt(category_id),
+      is_available: is_available !== undefined ? is_available === 'true' : true,
+      image_url: req.file ? req.file.url : null
+    };
 
     const product = await Product.create(productData);
 
@@ -112,10 +150,84 @@ router.post('/',
 
 // PUT /api/products/:id - Cập nhật sản phẩm (Admin only)
 router.put('/:id',
-  validate(productSchemas.update),
+  authenticateAdmin,
+  requireAdminOrManager,
+  uploadSingleImage('image'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const productData = req.body;
+    const { name, description, price, category_id, is_available } = req.body;
+
+    if (!id || isNaN(id)) {
+      if (req.file) {
+        deleteImage(req.file.filename);
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'ID sản phẩm không hợp lệ'
+      });
+    }
+
+    const productId = parseInt(id);
+
+    // Kiểm tra sản phẩm có tồn tại không
+    const existingProduct = await Product.findById(productId);
+    if (!existingProduct) {
+      if (req.file) {
+        deleteImage(req.file.filename);
+      }
+      return res.status(404).json({
+        success: false,
+        message: 'Sản phẩm không tồn tại'
+      });
+    }
+
+    // Kiểm tra danh mục nếu có thay đổi
+    if (category_id) {
+      const category = await Category.findById(parseInt(category_id));
+      if (!category) {
+        if (req.file) {
+          deleteImage(req.file.filename);
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'Danh mục không tồn tại'
+        });
+      }
+    }
+
+    const productData = {};
+    if (name !== undefined) productData.name = name;
+    if (description !== undefined) productData.description = description;
+    if (price !== undefined) productData.price = parseFloat(price);
+    if (category_id !== undefined) productData.category_id = parseInt(category_id);
+    if (is_available !== undefined) productData.is_available = is_available === 'true';
+
+    // Xử lý ảnh mới
+    if (req.file) {
+      // Xóa ảnh cũ nếu có
+      if (existingProduct.image_url) {
+        const oldImageName = existingProduct.image_url.split('/').pop();
+        deleteImage(oldImageName);
+      }
+      productData.image_url = req.file.url;
+    }
+
+    const product = await Product.update(productId, productData);
+
+    res.json({
+      success: true,
+      message: 'Cập nhật sản phẩm thành công',
+      data: product.toJSON()
+    });
+  })
+);
+
+// DELETE /api/products/:id - Xóa sản phẩm (Admin only)
+router.delete('/:id', 
+  authenticateAdmin,
+  requireAdminOrManager,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
     if (!id || isNaN(id)) {
       return res.status(400).json({
@@ -135,44 +247,44 @@ router.put('/:id',
       });
     }
 
-    const product = await Product.update(productId, productData);
+    // Xóa ảnh nếu có
+    if (existingProduct.image_url) {
+      const imageName = existingProduct.image_url.split('/').pop();
+      deleteImage(imageName);
+    }
+
+    await Product.delete(productId);
 
     res.json({
       success: true,
-      message: 'Cập nhật sản phẩm thành công',
-      data: product.toJSON()
+      message: 'Xóa sản phẩm thành công'
     });
   })
 );
 
-// DELETE /api/products/:id - Xóa sản phẩm (Admin only)
-router.delete('/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
+// POST /api/products/upload-image - Upload ảnh riêng (Admin only)
+router.post('/upload-image',
+  authenticateAdmin,
+  requireAdminOrManager,
+  uploadSingleImage('image'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn file ảnh'
+      });
+    }
 
-  if (!id || isNaN(id)) {
-    return res.status(400).json({
-      success: false,
-      message: 'ID sản phẩm không hợp lệ'
+    res.json({
+      success: true,
+      message: 'Upload ảnh thành công',
+      data: {
+        filename: req.file.filename,
+        url: req.file.url,
+        size: req.file.size
+      }
     });
-  }
-
-  const productId = parseInt(id);
-
-  // Kiểm tra sản phẩm có tồn tại không
-  const existingProduct = await Product.findById(productId);
-  if (!existingProduct) {
-    return res.status(404).json({
-      success: false,
-      message: 'Sản phẩm không tồn tại'
-    });
-  }
-
-  await Product.delete(productId);
-
-  res.json({
-    success: true,
-    message: 'Xóa sản phẩm thành công'
-  });
-}));
+  })
+);
 
 module.exports = router;
