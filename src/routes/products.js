@@ -103,48 +103,71 @@ router.post('/',
   requireAdminOrManager,
   uploadSingleImage('image'),
   asyncHandler(async (req, res) => {
-    const { name, description, price, category_id, is_available } = req.body;
+    console.log('POST /api/products - Request received');
+    console.log('Body:', req.body);
+    console.log('File:', req.file ? { filename: req.file.filename, size: req.file.size } : 'No file');
+    
+    try {
+      const { name, description, price, category_id, is_available } = req.body;
 
-    // Validate required fields
-    if (!name || !price || !category_id) {
-      // Xóa file đã upload nếu có lỗi validation
+      // Validate required fields
+      if (!name || !price || !category_id) {
+        console.log('Validation failed: Missing required fields');
+        // Xóa file đã upload nếu có lỗi validation
+        if (req.file) {
+          deleteImage(req.file.filename);
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng nhập đầy đủ thông tin: tên, giá, danh mục'
+        });
+      }
+
+      console.log('Checking category exists:', category_id);
+      // Kiểm tra danh mục có tồn tại không
+      const category = await Category.findById(parseInt(category_id));
+      if (!category) {
+        console.log('Category not found:', category_id);
+        if (req.file) {
+          deleteImage(req.file.filename);
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'Danh mục không tồn tại'
+        });
+      }
+
+      console.log('Creating product with data');
+      const productData = {
+        name,
+        description: description || '',
+        price: parseFloat(price),
+        category_id: parseInt(category_id),
+        is_available: is_available !== undefined ? is_available === 'true' : true,
+        image_url: req.file ? req.file.url : null
+      };
+
+      console.log('Product data:', productData);
+      const product = await Product.create(productData);
+      console.log('Product created successfully:', product.id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Tạo sản phẩm thành công',
+        data: product.toJSON()
+      });
+    } catch (error) {
+      console.error('Error in POST /api/products:', error);
+      // Xóa file đã upload nếu có lỗi
       if (req.file) {
         deleteImage(req.file.filename);
       }
-      return res.status(400).json({
+      
+      res.status(500).json({
         success: false,
-        message: 'Vui lòng nhập đầy đủ thông tin: tên, giá, danh mục'
+        message: 'Lỗi server khi tạo sản phẩm: ' + error.message
       });
     }
-
-    // Kiểm tra danh mục có tồn tại không
-    const category = await Category.findById(parseInt(category_id));
-    if (!category) {
-      if (req.file) {
-        deleteImage(req.file.filename);
-      }
-      return res.status(400).json({
-        success: false,
-        message: 'Danh mục không tồn tại'
-      });
-    }
-
-    const productData = {
-      name,
-      description: description || '',
-      price: parseFloat(price),
-      category_id: parseInt(category_id),
-      is_available: is_available !== undefined ? is_available === 'true' : true,
-      image_url: req.file ? req.file.url : null
-    };
-
-    const product = await Product.create(productData);
-
-    res.status(201).json({
-      success: true,
-      message: 'Tạo sản phẩm thành công',
-      data: product.toJSON()
-    });
   })
 );
 
@@ -259,6 +282,85 @@ router.delete('/:id',
       success: true,
       message: 'Xóa sản phẩm thành công'
     });
+  })
+);
+
+// POST /api/products/test - Test endpoint (Admin only)
+router.post('/test', 
+  authenticateAdmin,
+  requireAdminOrManager,
+  asyncHandler(async (req, res) => {
+    console.log('Test endpoint hit');
+    res.json({
+      success: true,
+      message: 'Test endpoint working',
+      data: {
+        timestamp: new Date().toISOString(),
+        body: req.body,
+        admin: req.admin ? { id: req.admin.id, username: req.admin.username } : null
+      }
+    });
+  })
+);
+
+// POST /api/products/simple - Simplified create without upload (Admin only)
+router.post('/simple', 
+  authenticateAdmin,
+  requireAdminOrManager,
+  asyncHandler(async (req, res) => {
+    console.log('Simple POST /api/products/simple - Request received');
+    console.log('Body:', req.body);
+    
+    try {
+      const { name, description, price, category_id, is_available } = req.body;
+
+      // Validate required fields
+      if (!name || !price || !category_id) {
+        console.log('Validation failed: Missing required fields');
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng nhập đầy đủ thông tin: tên, giá, danh mục'
+        });
+      }
+
+      console.log('Checking category exists:', category_id);
+      // Kiểm tra danh mục có tồn tại không
+      const category = await Category.findById(parseInt(category_id));
+      if (!category) {
+        console.log('Category not found:', category_id);
+        return res.status(400).json({
+          success: false,
+          message: 'Danh mục không tồn tại'
+        });
+      }
+
+      console.log('Creating product with data');
+      const productData = {
+        name,
+        description: description || '',
+        price: parseFloat(price),
+        category_id: parseInt(category_id),
+        is_available: is_available !== undefined ? is_available === 'true' : true,
+        image_url: null // No image for simple endpoint
+      };
+
+      console.log('Product data:', productData);
+      const product = await Product.create(productData);
+      console.log('Product created successfully:', product.id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Tạo sản phẩm thành công',
+        data: product.toJSON()
+      });
+    } catch (error) {
+      console.error('Error in POST /api/products/simple:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi tạo sản phẩm: ' + error.message
+      });
+    }
   })
 );
 

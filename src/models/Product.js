@@ -328,6 +328,7 @@ class Product {
       description: this.description,
       price: parseFloat(this.price),
       image: this.image_url,
+      image_url: this.image_url, // Keep both for compatibility
       category: this.category_name || null,
       category_id: Number(this.category_id),
       is_available: Boolean(this.is_available),

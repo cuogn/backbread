@@ -44,10 +44,26 @@ const upload = multer({
 // Middleware xử lý upload single image
 const uploadSingleImage = (fieldName = 'image') => {
   return (req, res, next) => {
+    console.log('Upload middleware started for field:', fieldName);
+    
+    // Set timeout for upload
+    const timeoutId = setTimeout(() => {
+      console.error('Upload timeout after 30 seconds');
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          message: 'Upload timeout. Vui lòng thử lại với file nhỏ hơn.'
+        });
+      }
+    }, 30000); // 30 second timeout
+    
     const uploadSingle = upload.single(fieldName);
     
     uploadSingle(req, res, (err) => {
+      clearTimeout(timeoutId); // Clear timeout if upload completes
+      
       if (err instanceof multer.MulterError) {
+        console.error('Multer error:', err);
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({
             success: false,
@@ -65,6 +81,7 @@ const uploadSingleImage = (fieldName = 'image') => {
           });
         }
       } else if (err) {
+        console.error('Upload error:', err);
         return res.status(400).json({
           success: false,
           message: err.message
@@ -73,7 +90,10 @@ const uploadSingleImage = (fieldName = 'image') => {
       
       // Thêm thông tin file vào request
       if (req.file) {
+        console.log('File uploaded successfully:', req.file.filename);
         req.file.url = `/uploads/products/${req.file.filename}`;
+      } else {
+        console.log('No file uploaded');
       }
       
       next();
