@@ -29,7 +29,9 @@ const config = {
         'https://son-bread.vercel.app',           // Production frontend
         'https://www.son-bread.vercel.app',       // Production frontend with www
         'https://banhmyson.com',                  // Custom domain
-        'https://www.banhmyson.com',              // Custom domain with www
+        'https://www.banhmyson.com',
+        'https://banhmison.com',
+        'https://www.banhmison.com',
         'http://localhost:3000',                  // Local development frontend
         'http://127.0.0.1:3000',                  // Local development frontend alternative
         'https://backbread.onrender.com'          // Backend itself (for testing)

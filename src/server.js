@@ -51,8 +51,28 @@ app.use('/api', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static('uploads'));
+// Static files - serve uploads directory
+const path = require('path');
+const fs = require('fs');
+const uploadsPath = path.join(__dirname, '../uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log('📁 Created uploads directory:', uploadsPath);
+}
+
+// Ensure products subdirectory exists
+const productsPath = path.join(uploadsPath, 'products');
+if (!fs.existsSync(productsPath)) {
+  fs.mkdirSync(productsPath, { recursive: true });
+  console.log('📁 Created products directory:', productsPath);
+}
+
+app.use('/uploads', express.static(uploadsPath));
+
+// Debug: Log uploads directory path
+console.log('📁 Uploads directory path:', uploadsPath);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -62,6 +82,63 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: config.server.env,
     version: '1.0.0'
+  });
+});
+
+// Debug endpoint to check uploads directory
+app.get('/debug/uploads', (req, res) => {
+  try {
+    const files = fs.readdirSync(productsPath);
+    res.json({
+      success: true,
+      uploadsPath,
+      productsPath,
+      filesCount: files.length,
+      files: files.slice(0, 10), // Show first 10 files
+      directoryExists: fs.existsSync(productsPath),
+      canWrite: true // We'll assume we can write for now
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      uploadsPath,
+      productsPath,
+      directoryExists: fs.existsSync(productsPath)
+    });
+  }
+});
+
+// Fallback endpoint for direct file access (in case static middleware fails)
+app.get('/uploads/products/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(productsPath, filename);
+  
+  console.log('📁 Requesting file:', filePath);
+  
+  if (fs.existsSync(filePath)) {
+    console.log('✅ File exists, serving:', filename);
+    res.sendFile(filePath);
+  } else {
+    console.log('❌ File not found:', filename);
+    // Instead of returning 404, redirect to placeholder image
+    const placeholderUrl = 'https://via.placeholder.com/400x300/f3f4f6/6b7280?text=Product+Image';
+    res.redirect(placeholderUrl);
+  }
+});
+
+// API endpoint to get file info
+app.get('/api/uploads/info/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(productsPath, filename);
+  
+  res.json({
+    success: true,
+    filename,
+    exists: fs.existsSync(filePath),
+    path: filePath,
+    url: `/uploads/products/${filename}`,
+    fullUrl: `${config.server.baseUrl}/uploads/products/${filename}`
   });
 });
 
