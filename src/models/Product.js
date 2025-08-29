@@ -172,10 +172,11 @@ class Product {
     }
   }
 
-  // Xóa sản phẩm (soft delete)
+  // Xóa sản phẩm (hard delete - xóa vĩnh viễn)
   static async delete(id) {
     try {
-      const query = `UPDATE products SET is_available = false WHERE id = $1`;
+      // Xóa vĩnh viễn khỏi database
+      const query = `DELETE FROM products WHERE id = $1`;
       await executeQuery(query, [id]);
       return true;
     } catch (error) {
