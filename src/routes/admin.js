@@ -197,11 +197,11 @@ router.post('/users', authenticateAdmin, requireAdmin, async (req, res) => {
 
 // ===== PRODUCT MANAGEMENT =====
 
-// Lấy danh sách sản phẩm (admin)
+// Lấy danh sách sản phẩm (admin) - hiển thị tất cả sản phẩm kể cả đã xóa
 router.get('/products', authenticateAdmin, requireAdminOrManager, async (req, res) => {
   try {
     const { page = 1, limit = 20, category, search } = req.query;
-    const products = await Product.findAllWithPagination({
+    const result = await Product.findAllWithPagination({
       page: parseInt(page),
       limit: parseInt(limit),
       category,
@@ -210,7 +210,10 @@ router.get('/products', authenticateAdmin, requireAdminOrManager, async (req, re
 
     res.json({
       success: true,
-      data: products
+      data: {
+        products: result.products.map(product => product.toJSON()),
+        pagination: result.pagination
+      }
     });
   } catch (error) {
     console.error('Get admin products error:', error);

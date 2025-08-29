@@ -278,7 +278,7 @@ class Product {
       const total = Number(countResult[0].total);
 
       return {
-        products,
+        products: products.map(row => new Product(row)),
         pagination: {
           page,
           limit,
