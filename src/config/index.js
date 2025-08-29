@@ -31,7 +31,8 @@ const config = {
         'https://banhmyson.com',                  // Custom domain
         'https://www.banhmyson.com',
         'https://banhmison.com',
-        'https://www.banhmison.com',
+        'banhmison.com',
+        'www.banhmison.com',
         'http://localhost:3000',                  // Local development frontend
         'http://127.0.0.1:3000',                  // Local development frontend alternative
         'https://backbread.onrender.com'          // Backend itself (for testing)
